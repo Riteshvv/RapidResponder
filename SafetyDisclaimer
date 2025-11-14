@@ -1,0 +1,66 @@
+import React from "react";
+import { AlertTriangle, Phone } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+
+export default function SafetyDisclaimer({ onAccept }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Important Safety Notice</h2>
+            <p className="text-sm text-slate-500">Please read carefully before continuing</p>
+          </div>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <Alert className="border-red-200 bg-red-50">
+            <AlertDescription className="text-slate-700">
+              <strong className="font-semibold text-red-700">For Life-Threatening Emergencies:</strong>
+              <br />
+              Always call 911 immediately. Do not use this app for heart attacks, severe bleeding, 
+              difficulty breathing, or any situation requiring immediate medical attention.
+            </AlertDescription>
+          </Alert>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 mb-2">This Service Is For:</h3>
+            <ul className="text-sm text-slate-700 space-y-1">
+              <li>✓ Non-critical assistance (minor injuries, wellness checks)</li>
+              <li>✓ Community support and companionship</li>
+              <li>✓ Car trouble or minor accidents without injuries</li>
+              <li>✓ Situations where official services are not immediately needed</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-slate-600">
+            By continuing, you acknowledge that community responders are volunteers and this service 
+            does not replace professional emergency services. Always use your best judgment and call 
+            911 when in doubt.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={() => window.location.href = "tel:911"}
+            variant="outline"
+            className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
+          >
+            <Phone className="w-4 h-4 mr-2" />
+            Call 911 Now
+          </Button>
+          <Button
+            onClick={onAccept}
+            className="flex-1 bg-blue-600 hover:bg-blue-700"
+          >
+            I Understand, Continue
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
