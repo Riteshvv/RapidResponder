@@ -61,4 +61,6 @@ A large portion of 911 calls are non-emergencies, overwhelming dispatch systems 
 ---
 
 ## Screenshots
+<img width="1614" height="830" alt="image" src="https://github.com/user-attachments/assets/f1c20eb7-5717-4078-baea-251f92f775af" />
+
 <img width="1619" height="712" alt="image" src="https://github.com/user-attachments/assets/9e8727a2-24da-4939-ad72-bdca11dc010c" />
