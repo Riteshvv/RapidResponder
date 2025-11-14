@@ -1,0 +1,484 @@
+
+import React, { useState, useEffect } from "react";
+import { HIDDEN } from "@/api/HIDDENClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Shield, AlertCircle, MapPin, Clock, CheckCircle2, Star } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import SafetyDisclaimer from "../components/SafetyDisclaimer";
+import RequestForm from "../components/RequestForm";
+import RequestCard from "../components/RequestCard";
+import ResponderMap from "../components/ResponderMap";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import RoleOnboarding from "../components/RoleOnboarding";
+
+export default function Home() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState("");
+  const [activeTab, setActiveTab] = useState("available");
+
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => HIDDEN.auth.me(),
+  });
+
+  const { data: myRequests = [], isLoading: requestsLoading } = useQuery({
+    queryKey: ['myRequests', user?.id],
+    queryFn: () => HIDDEN.entities.Request.filter({ citizen_id: user.id }, '-created_date'),
+    enabled: !!user,
+  });
+
+  const { data: availableRequests = [], isLoading: availableLoading } = useQuery({
+    queryKey: ['availableRequests'],
+    queryFn: () => HIDDEN.entities.Request.filter({ status: 'requested' }, '-created_date'),
+    enabled: !!user && (user.responder_status === 'verified_responder' || user.responder_status === 'pending_verification'),
+    refetchInterval: 10000,
+  });
+
+  const { data: myAcceptedRequests = [] } = useQuery({
+    queryKey: ['myAcceptedRequests', user?.id],
+    queryFn: () => HIDDEN.entities.Request.filter({ responder_id: user.id }, '-created_date'),
+    enabled: !!user && user.responder_status === 'verified_responder',
+  });
+
+  const createRequestMutation = useMutation({
+    mutationFn: async (requestData) => {
+      return HIDDEN.entities.Request.create({
+        ...requestData,
+        citizen_id: user.id,
+        citizen_name: user.full_name,
+        citizen_phone: user.phone || user.email,
+        status: 'requested'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myRequests'] });
+      setShowRequestForm(false);
+    },
+  });
+
+  const acceptRequestMutation = useMutation({
+    mutationFn: async (requestId) => {
+      return HIDDEN.entities.Request.update(requestId, {
+        status: 'accepted',
+        responder_id: user.id,
+        responder_name: user.full_name,
+        accepted_at: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['availableRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['myAcceptedRequests'] });
+      setSelectedRequest(null);
+    },
+  });
+
+  const checkInMutation = useMutation({
+    mutationFn: async (requestId) => {
+      return HIDDEN.entities.Request.update(requestId, {
+        status: 'checked_in',
+        checked_in_at: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myAcceptedRequests'] });
+      setSelectedRequest(null);
+    },
+  });
+
+  const completeRequestMutation = useMutation({
+    mutationFn: async (requestId) => {
+      const request = await HIDDEN.entities.Request.update(requestId, {
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      });
+      
+      if (user.responder_status === 'verified_responder') {
+        await HIDDEN.auth.updateMe({
+          points: (user.points || 0) + 10,
+          completed_requests: (user.completed_requests || 0) + 1
+        });
+      }
+      
+      return request;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myAcceptedRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['myRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      setSelectedRequest(null);
+    },
+  });
+
+  const submitRatingMutation = useMutation({
+    mutationFn: async ({ requestId, rating, feedback }) => {
+      return HIDDEN.entities.Request.update(requestId, { rating, feedback });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myRequests'] });
+      setShowRatingDialog(false);
+      setRating(0);
+      setFeedback("");
+    },
+  });
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Skeleton className="h-64 w-96" />
+      </div>
+    );
+  }
+
+  if (!user.onboarding_completed) {
+    return <RoleOnboarding onComplete={() => queryClient.invalidateQueries({ queryKey: ['currentUser'] })} />;
+  }
+
+  if (showDisclaimer) {
+    return <SafetyDisclaimer onAccept={() => setShowDisclaimer(false)} />;
+  }
+
+  const isResponder = user.responder_status === 'verified_responder' || user.responder_status === 'pending_verification';
+
+  if (!isResponder) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">Community Emergency Support</h1>
+            <p className="text-slate-600">Get non-critical assistance from verified local responders</p>
+          </div>
+
+          {!showRequestForm ? (
+            <>
+              <Card className="p-8 mb-6 bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 mb-3">Need Help?</h2>
+                  <p className="text-slate-700 mb-6">Request assistance from nearby verified responders for non-emergency situations</p>
+                  <Button
+                    onClick={() => setShowRequestForm(true)}
+                    className="bg-red-600 hover:bg-red-700 h-12 px-8 text-lg font-semibold"
+                  >
+                    Request Help Now
+                  </Button>
+                </div>
+              </Card>
+
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">My Requests</h2>
+                {requestsLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 w-full" />)}
+                  </div>
+                ) : myRequests.length > 0 ? (
+                  <div className="grid gap-4">
+                    {myRequests.map(request => (
+                      <div key={request.id}>
+                        <RequestCard 
+                          request={request}
+                          onClick={() => setSelectedRequest(request)}
+                        />
+                        {request.status === 'completed' && !request.rating && (
+                          <Button
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setShowRatingDialog(true);
+                            }}
+                            variant="outline"
+                            className="w-full mt-2"
+                          >
+                            <Star className="w-4 h-4 mr-2" />
+                            Rate This Response
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="p-12 text-center">
+                    <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-600">You haven't made any requests yet</p>
+                  </Card>
+                )}
+              </div>
+            </>
+          ) : (
+            <Card className="p-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Request Help</h2>
+                <p className="text-slate-600">Fill out the details below to connect with a nearby responder</p>
+              </div>
+              <RequestForm
+                onSubmit={(data) => createRequestMutation.mutate(data)}
+                isSubmitting={createRequestMutation.isPending}
+              />
+              <Button
+                variant="outline"
+                onClick={() => setShowRequestForm(false)}
+                className="w-full mt-4"
+              >
+                Cancel
+              </Button>
+            </Card>
+          )}
+        </div>
+
+        {selectedRequest && (
+          <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Request Details</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <RequestCard request={selectedRequest} />
+                {selectedRequest.responder_name && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-blue-900">Responder: {selectedRequest.responder_name}</p>
+                    {selectedRequest.accepted_at && (
+                      <p className="text-xs text-slate-600 mt-1">
+                        Accepted at {new Date(selectedRequest.accepted_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {showRatingDialog && selectedRequest && (
+          <Dialog open={showRatingDialog} onOpenChange={() => setShowRatingDialog(false)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Rate Your Experience</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Rating</Label>
+                  <div className="flex gap-2 mt-2">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        onClick={() => setRating(star)}
+                        className="transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`w-8 h-8 ${
+                            star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="feedback">Feedback (Optional)</Label>
+                  <Textarea
+                    id="feedback"
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    placeholder="Share your experience..."
+                    className="mt-2"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={() => submitRatingMutation.mutate({
+                    requestId: selectedRequest.id,
+                    rating,
+                    feedback
+                  })}
+                  disabled={rating === 0}
+                >
+                  Submit Rating
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+    );
+  }
+
+  // Responder view
+  const canAcceptRequests = user.responder_status === 'verified_responder';
+
+  return (
+    <div className="h-screen flex flex-col">
+      {user.responder_status === 'pending_verification' && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-4">
+          <div className="max-w-6xl mx-auto flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-900">
+                Your responder account is pending verification. You can view requests but cannot accept them yet.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex">
+        <div className="w-96 bg-white border-r border-slate-200 overflow-y-auto">
+          <div className="p-6 border-b border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-900 mb-1">Active Requests</h2>
+            <p className="text-sm text-slate-600">Help those in need nearby</p>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="p-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="available" className="flex-1">Available</TabsTrigger>
+              <TabsTrigger value="mine" className="flex-1">My Requests</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="available" className="space-y-3 mt-4">
+              {availableLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-48" />)}
+                </div>
+              ) : availableRequests.length > 0 ? (
+                availableRequests.map(request => (
+                  <RequestCard
+                    key={request.id}
+                    request={request}
+                    onClick={() => setSelectedRequest(request)}
+                    showDistance={true}
+                  />
+                ))
+              ) : (
+                <Card className="p-12 text-center">
+                  <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <p className="text-slate-600">No active requests at the moment</p>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="mine" className="space-y-3 mt-4">
+              {myAcceptedRequests.length > 0 ? (
+                myAcceptedRequests.map(request => (
+                  <RequestCard
+                    key={request.id}
+                    request={request}
+                    onClick={() => setSelectedRequest(request)}
+                  />
+                ))
+              ) : (
+                <Card className="p-12 text-center">
+                  <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                  <p className="text-slate-600">
+                    {canAcceptRequests 
+                      ? "You haven't accepted any requests yet"
+                      : "Once verified, you'll be able to accept requests"}
+                  </p>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className="flex-1">
+          <ResponderMap
+            requests={[...availableRequests, ...myAcceptedRequests]}
+            onRequestClick={(request) => setSelectedRequest(request)}
+          />
+        </div>
+      </div>
+
+      {selectedRequest && (
+        <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Request Details</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <RequestCard request={selectedRequest} />
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Citizen:</span>
+                  <span className="font-medium">{selectedRequest.citizen_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Contact:</span>
+                  <span className="font-medium">{selectedRequest.citizen_phone}</span>
+                </div>
+              </div>
+
+              {!canAcceptRequests && selectedRequest.status === 'requested' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800">
+                    Your account needs to be verified before you can accept requests. Please wait for admin approval.
+                  </p>
+                </div>
+              )}
+
+              {canAcceptRequests && selectedRequest.status === 'requested' && (
+                <Button
+                  onClick={() => acceptRequestMutation.mutate(selectedRequest.id)}
+                  disabled={acceptRequestMutation.isPending}
+                  className="w-full bg-blue-600 hover:bg-blue-700 h-12"
+                >
+                  Accept Request & Respond
+                </Button>
+              )}
+
+              {selectedRequest.status === 'accepted' && selectedRequest.responder_id === user.id && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={() => checkInMutation.mutate(selectedRequest.id)}
+                    disabled={checkInMutation.isPending}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 h-12"
+                  >
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Check In (I've Arrived)
+                  </Button>
+                  <Button
+                    onClick={() => completeRequestMutation.mutate(selectedRequest.id)}
+                    disabled={completeRequestMutation.isPending}
+                    variant="outline"
+                    className="w-full h-12"
+                  >
+                    Mark as Completed
+                  </Button>
+                </div>
+              )}
+
+              {selectedRequest.status === 'checked_in' && selectedRequest.responder_id === user.id && (
+                <Button
+                  onClick={() => completeRequestMutation.mutate(selectedRequest.id)}
+                  disabled={completeRequestMutation.isPending}
+                  className="w-full bg-green-600 hover:bg-green-700 h-12"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Mark as Completed
+                </Button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
