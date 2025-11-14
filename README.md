@@ -1,4 +1,6 @@
 # Rapid Responder  
+<img width="258" height="214" alt="image" src="https://github.com/user-attachments/assets/a500e95a-9b6d-4d34-b1e1-70f94f31353e" />
+
 
 Rapid Responder is an application that connects trained volunteers and retired first responders with nearby residents who need assistance in non-emergency situations such as minor injuries, wellness checks, or car trouble. Its purpose is to ease pressure on 911 systems, improve community response times, and strengthen neighborhood safety.
 
@@ -15,7 +17,7 @@ Rapid Responder is an application that connects trained volunteers and retired f
 
 ---
 
-## Tech Stack
+## Tech Side
 
 ### Frontend
 - Swift (iOS)  
@@ -59,13 +61,4 @@ A large portion of 911 calls are non-emergencies, overwhelming dispatch systems 
 ---
 
 ## Screenshots
-(Add your screenshots here.)
-
----
-
-## Installation
-
-### Backend
-```bash
-npm install
-npm run dev
+<img width="1619" height="712" alt="image" src="https://github.com/user-attachments/assets/9e8727a2-24da-4939-ad72-bdca11dc010c" />
