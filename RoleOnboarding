@@ -1,0 +1,292 @@
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Shield, Users, Heart, CheckCircle2, AlertCircle } from "lucide-react";
+import { HIDDEN } from "@/api/HIDDENClient";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+
+export default function RoleOnboarding({ onComplete }) {
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({
+    phone: '',
+    bio: '',
+    medical_certifications: []
+  });
+  const [certInput, setCertInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    setStep(2);
+  };
+
+  const addCertification = () => {
+    if (certInput.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        medical_certifications: [...prev.medical_certifications, certInput.trim()]
+      }));
+      setCertInput('');
+    }
+  };
+
+  const removeCertification = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      medical_certifications: prev.medical_certifications.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    try {
+      await HIDDEN.auth.updateMe({
+        responder_status: selectedRole === 'responder' ? 'pending_verification' : 'not_responder',
+        onboarding_completed: true,
+        phone: formData.phone,
+        bio: formData.bio,
+        medical_certifications: formData.medical_certifications
+      });
+      onComplete();
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("There was an error setting up your profile. Please try again.");
+      setIsSubmitting(false);
+    }
+  };
+
+  if (step === 1) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-800 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-5xl w-full py-8"
+        >
+          <div className="text-center mb-12">
+            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+              <Shield className="w-10 h-10 text-blue-600" />
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-4">Welcome to Rapid Responder</h1>
+            <p className="text-xl text-blue-100">Let's get you set up. How would you like to use the platform?</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <motion.div
+              whileHover={{ scale: 1.02, y: -4 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Card
+                onClick={() => handleRoleSelect('citizen')}
+                className="p-8 cursor-pointer bg-white hover:shadow-2xl transition-all duration-300 border-4 border-transparent hover:border-blue-400"
+              >
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Users className="w-10 h-10 text-blue-600" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-slate-900 mb-4">I Need Help</h2>
+                  <p className="text-slate-600 mb-6 leading-relaxed">
+                    I'm a community member who may need assistance with non-emergency situations.
+                  </p>
+                  <div className="space-y-3 text-left">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Request help from verified responders nearby</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Get assistance for minor injuries, car trouble, wellness checks</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Track request status in real-time</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ scale: 1.02, y: -4 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Card
+                onClick={() => handleRoleSelect('responder')}
+                className="p-8 cursor-pointer bg-white hover:shadow-2xl transition-all duration-300 border-4 border-transparent hover:border-green-400"
+              >
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Heart className="w-10 h-10 text-green-600" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-slate-900 mb-4">I Can Help</h2>
+                  <p className="text-slate-600 mb-6 leading-relaxed">
+                    I'm a retired first responder or medically trained volunteer ready to assist my community.
+                  </p>
+                  <div className="space-y-3 text-left">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Respond to nearby requests for help</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Earn points and recognition for community service</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-700">Make a real difference in people's lives</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          </div>
+
+          <div className="mt-12 max-w-2xl mx-auto bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
+            <div className="flex items-start gap-4 text-white">
+              <AlertCircle className="w-6 h-6 flex-shrink-0 mt-1" />
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Important Safety Note</h3>
+                <p className="text-blue-100 text-sm leading-relaxed">
+                  This platform is for non-emergency situations only. For life-threatening emergencies, 
+                  always call 911 immediately. Responders will undergo verification before being approved 
+                  to help ensure community safety.
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-600 to-blue-800 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-2xl w-full my-8"
+      >
+        <Card className="p-8">
+          <div className="text-center mb-8">
+            <div className={`w-16 h-16 ${selectedRole === 'responder' ? 'bg-green-100' : 'bg-blue-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+              {selectedRole === 'responder' ? (
+                <Heart className="w-8 h-8 text-green-600" />
+              ) : (
+                <Users className="w-8 h-8 text-blue-600" />
+              )}
+            </div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">Complete Your Profile</h2>
+            <p className="text-slate-600">Help us serve you better with a few more details</p>
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); handleComplete(); }} className="space-y-6">
+            <div>
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="+1 (555) 123-4567"
+                required
+                className="mt-2"
+              />
+              <p className="text-xs text-slate-500 mt-1">For emergency contact purposes</p>
+            </div>
+
+            <div>
+              <Label htmlFor="bio">Brief Bio {selectedRole === 'responder' ? '*' : '(Optional)'}</Label>
+              <Textarea
+                id="bio"
+                value={formData.bio}
+                onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
+                placeholder={selectedRole === 'responder' 
+                  ? "Tell us about your background (e.g., 'Retired EMT with 15 years experience')"
+                  : "Tell us a bit about yourself (optional)"
+                }
+                required={selectedRole === 'responder'}
+                className="mt-2 min-h-[100px]"
+              />
+            </div>
+
+            {selectedRole === 'responder' && (
+              <div>
+                <Label>Medical Certifications (Optional)</Label>
+                <p className="text-xs text-slate-500 mb-2">Add any certifications like EMT, CPR, First Aid, etc.</p>
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    value={certInput}
+                    onChange={(e) => setCertInput(e.target.value)}
+                    placeholder="e.g., EMT-B, CPR Certified"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addCertification();
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={addCertification} variant="outline">
+                    Add
+                  </Button>
+                </div>
+                {formData.medical_certifications.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.medical_certifications.map((cert, idx) => (
+                      <div key={idx} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                        {cert}
+                        <button
+                          type="button"
+                          onClick={() => removeCertification(idx)}
+                          className="hover:text-blue-900"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedRole === 'responder' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-yellow-900 mb-1">Verification Required</h4>
+                    <p className="text-sm text-yellow-800">
+                      Your account will be pending verification by administrators before you can accept requests. 
+                      This helps ensure community safety and trust. You can view requests but won't be able to accept them until verified.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(1)}
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className={`flex-1 ${selectedRole === 'responder' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                {isSubmitting ? 'Setting up...' : 'Complete Setup'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </motion.div>
+    </div>
+  );
+}
