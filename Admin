@@ -1,0 +1,426 @@
+import React, { useState } from "react";
+import { HIDDEN } from "@/api/HIDDENClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Shield, Users, CheckCircle2, XCircle, Clock, Award, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+
+export default function Admin() {
+  const queryClient = useQueryClient();
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("pending");
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => HIDDEN.auth.me(),
+  });
+
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['allUsers'],
+    queryFn: () => HIDDEN.entities.User.list('-created_date'),
+    enabled: !!currentUser,
+  });
+
+  const { data: allRequests = [] } = useQuery({
+    queryKey: ['allRequestsAdmin'],
+    queryFn: () => HIDDEN.entities.Request.list('-created_date'),
+    enabled: !!currentUser,
+  });
+
+  const approveResponderMutation = useMutation({
+    mutationFn: async (userId) => {
+      return HIDDEN.entities.User.update(userId, {
+        responder_status: 'verified_responder',
+        verification_status: 'verified'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      setSelectedUser(null);
+    },
+  });
+
+  const rejectResponderMutation = useMutation({
+    mutationFn: async ({ userId, reason }) => {
+      return HIDDEN.entities.User.update(userId, {
+        responder_status: 'not_responder',
+        verification_status: 'rejected'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      setSelectedUser(null);
+      setRejectionReason("");
+    },
+  });
+
+  const pendingResponders = allUsers.filter(u => u.responder_status === 'pending_verification');
+  const verifiedResponders = allUsers.filter(u => u.responder_status === 'verified_responder');
+  const citizens = allUsers.filter(u => u.responder_status === 'not_responder' || !u.responder_status);
+
+  if (usersLoading) {
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-6xl mx-auto">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Check if current user has admin access (you can adjust this logic)
+  const isAdmin = currentUser?.email?.includes('admin') || currentUser?.role === 'admin';
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <Card className="p-8 max-w-md text-center">
+          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
+          <p className="text-slate-600">You don't have permission to access the admin dashboard.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const UserCard = ({ user }) => {
+    const statusColors = {
+      not_responder: "bg-blue-100 text-blue-700 border-blue-200",
+      pending_verification: "bg-yellow-100 text-yellow-700 border-yellow-200",
+      verified_responder: "bg-green-100 text-green-700 border-green-200"
+    };
+
+    return (
+      <Card
+        onClick={() => setSelectedUser(user)}
+        className="cursor-pointer hover:shadow-lg transition-all duration-200 border-slate-200"
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-300 to-slate-400 rounded-full flex items-center justify-center">
+                <span className="text-slate-700 font-bold text-lg">
+                  {user.full_name?.[0]?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div>
+                <CardTitle className="text-lg">{user.full_name}</CardTitle>
+                <p className="text-sm text-slate-500">{user.email}</p>
+              </div>
+            </div>
+            <Badge className={`${statusColors[user.responder_status || 'not_responder']} border font-medium`}>
+              {user.responder_status === 'pending_verification' ? 'Pending' : 
+               user.responder_status === 'verified_responder' ? 'Verified' : 'Citizen'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-slate-500">Joined</p>
+              <p className="font-medium">{format(new Date(user.created_date), "MMM d, yyyy")}</p>
+            </div>
+            {user.responder_status === 'verified_responder' && (
+              <>
+                <div>
+                  <p className="text-slate-500">Points</p>
+                  <p className="font-medium">{user.points || 0}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Completed</p>
+                  <p className="font-medium">{user.completed_requests || 0} requests</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Rating</p>
+                  <p className="font-medium">{user.average_rating ? user.average_rating.toFixed(1) : 'N/A'}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
+          <p className="text-slate-600">Manage users, verify responders, and oversee platform activity</p>
+        </div>
+
+        {/* Stats Overview */}
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-500">Total Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <span className="text-3xl font-bold text-slate-900">{allUsers.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-500">Pending Verification</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-yellow-600" />
+                </div>
+                <span className="text-3xl font-bold text-slate-900">{pendingResponders.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-500">Verified Responders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                </div>
+                <span className="text-3xl font-bold text-slate-900">{verifiedResponders.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-500">Total Requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Award className="w-5 h-5 text-purple-600" />
+                </div>
+                <span className="text-3xl font-bold text-slate-900">{allRequests.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pending Approvals Alert */}
+        {pendingResponders.length > 0 && (
+          <Card className="mb-6 bg-yellow-50 border-yellow-200">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="w-6 h-6 text-yellow-600 mt-1" />
+                <div>
+                  <h3 className="font-semibold text-yellow-900 mb-1">
+                    {pendingResponders.length} Responder{pendingResponders.length !== 1 ? 's' : ''} Awaiting Verification
+                  </h3>
+                  <p className="text-sm text-yellow-800">
+                    Please review and approve or reject responder applications to maintain platform safety.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* User Management Tabs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>User Management</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="mb-6">
+                <TabsTrigger value="pending">
+                  Pending Verification
+                  {pendingResponders.length > 0 && (
+                    <Badge className="ml-2 bg-yellow-500 text-white">{pendingResponders.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="verified">Verified Responders</TabsTrigger>
+                <TabsTrigger value="citizens">Citizens</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pending">
+                {pendingResponders.length > 0 ? (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {pendingResponders.map(user => (
+                      <UserCard key={user.id} user={user} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                    <p className="text-slate-600">No pending verifications</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="verified">
+                {verifiedResponders.length > 0 ? (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {verifiedResponders.map(user => (
+                      <UserCard key={user.id} user={user} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-600">No verified responders yet</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="citizens">
+                {citizens.length > 0 ? (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {citizens.map(user => (
+                      <UserCard key={user.id} user={user} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-600">No citizens registered</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* User Detail Dialog */}
+        {selectedUser && (
+          <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>User Details</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-slate-300 to-slate-400 rounded-full flex items-center justify-center">
+                    <span className="text-slate-700 font-bold text-2xl">
+                      {selectedUser.full_name?.[0]?.toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-900">{selectedUser.full_name}</h3>
+                    <p className="text-slate-600">{selectedUser.email}</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <div>
+                    <p className="text-sm text-slate-500">Status</p>
+                    <p className="font-semibold capitalize">
+                      {selectedUser.responder_status?.replace(/_/g, ' ') || 'Citizen'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Member Since</p>
+                    <p className="font-semibold">{format(new Date(selectedUser.created_date), "MMMM d, yyyy")}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Phone</p>
+                    <p className="font-semibold">{selectedUser.phone || 'Not provided'}</p>
+                  </div>
+                  {selectedUser.responder_status === 'verified_responder' && (
+                    <>
+                      <div>
+                        <p className="text-sm text-slate-500">Points</p>
+                        <p className="font-semibold">{selectedUser.points || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Completed Requests</p>
+                        <p className="font-semibold">{selectedUser.completed_requests || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Average Rating</p>
+                        <p className="font-semibold">
+                          {selectedUser.average_rating ? selectedUser.average_rating.toFixed(1) : 'N/A'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {selectedUser.bio && (
+                  <div>
+                    <Label className="text-slate-500 text-sm">Bio</Label>
+                    <p className="mt-2 text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      {selectedUser.bio}
+                    </p>
+                  </div>
+                )}
+
+                {selectedUser.medical_certifications && selectedUser.medical_certifications.length > 0 && (
+                  <div>
+                    <Label className="text-slate-500 text-sm">Medical Certifications</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedUser.medical_certifications.map((cert, idx) => (
+                        <Badge key={idx} variant="outline" className="bg-blue-50">
+                          {cert}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedUser.responder_status === 'pending_verification' && (
+                  <div className="border-t pt-6 space-y-4">
+                    <h4 className="font-semibold text-slate-900">Verification Actions</h4>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => approveResponderMutation.mutate(selectedUser.id)}
+                        disabled={approveResponderMutation.isPending}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Approve as Responder
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to reject this application?')) {
+                            rejectResponderMutation.mutate({ 
+                              userId: selectedUser.id, 
+                              reason: rejectionReason 
+                            });
+                          }
+                        }}
+                        disabled={rejectResponderMutation.isPending}
+                        variant="outline"
+                        className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Reject Application
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+    </div>
+  );
+}
