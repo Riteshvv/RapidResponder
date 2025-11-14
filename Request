@@ -1,0 +1,110 @@
+{
+  "name": "Request",
+  "type": "object",
+  "properties": {
+    "citizen_id": {
+      "type": "string",
+      "description": "ID of the citizen requesting help"
+    },
+    "citizen_name": {
+      "type": "string",
+      "description": "Name of the citizen"
+    },
+    "citizen_phone": {
+      "type": "string",
+      "description": "Contact phone of citizen"
+    },
+    "responder_id": {
+      "type": "string",
+      "description": "ID of the responder who accepted"
+    },
+    "responder_name": {
+      "type": "string",
+      "description": "Name of the responder"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number"
+        },
+        "lng": {
+          "type": "number"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "description": "GPS location of the request"
+    },
+    "request_type": {
+      "type": "string",
+      "enum": [
+        "minor_injury",
+        "wellness_check",
+        "car_trouble",
+        "fall_assistance",
+        "medication_help",
+        "other"
+      ],
+      "description": "Type of help needed"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the situation"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "requested",
+        "accepted",
+        "checked_in",
+        "completed",
+        "cancelled"
+      ],
+      "default": "requested",
+      "description": "Current status of the request"
+    },
+    "urgency": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium",
+      "description": "Urgency level"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when request was accepted"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when request was completed"
+    },
+    "checked_in_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when responder checked in"
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Citizen rating of the response"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "Citizen feedback"
+    }
+  },
+  "required": [
+    "citizen_id",
+    "location",
+    "request_type",
+    "description"
+  ]
+}
