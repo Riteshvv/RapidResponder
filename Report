@@ -1,0 +1,95 @@
+{
+  "name": "Report",
+  "type": "object",
+  "properties": {
+    "reporter_id": {
+      "type": "string",
+      "description": "ID of the user submitting the report"
+    },
+    "reporter_name": {
+      "type": "string",
+      "description": "Name of the reporter"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "safety_concern",
+        "inappropriate_behavior",
+        "request_issue",
+        "responder_feedback",
+        "technical_problem",
+        "general_feedback",
+        "emergency_alert"
+      ],
+      "description": "Type of report being filed"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium",
+      "description": "Severity level of the report"
+    },
+    "title": {
+      "type": "string",
+      "description": "Brief title of the report"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the issue"
+    },
+    "related_request_id": {
+      "type": "string",
+      "description": "ID of related request if applicable"
+    },
+    "related_user_id": {
+      "type": "string",
+      "description": "ID of user being reported if applicable"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "under_review",
+        "resolved",
+        "dismissed"
+      ],
+      "default": "pending",
+      "description": "Status of the report"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Notes from admin reviewing the report"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the report was resolved"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number"
+        },
+        "lng": {
+          "type": "number"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "description": "Location related to the report"
+    }
+  },
+  "required": [
+    "reporter_id",
+    "report_type",
+    "title",
+    "description"
+  ]
+}
