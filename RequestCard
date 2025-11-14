@@ -1,0 +1,78 @@
+import React from "react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Clock, User, AlertCircle } from "lucide-react";
+import { format } from "date-fns";
+
+const typeLabels = {
+  minor_injury: "Minor Injury",
+  wellness_check: "Wellness Check",
+  car_trouble: "Car Trouble",
+  fall_assistance: "Fall Assistance",
+  medication_help: "Medication Help",
+  other: "Other"
+};
+
+const urgencyColors = {
+  low: "bg-blue-100 text-blue-700 border-blue-200",
+  medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  high: "bg-red-100 text-red-700 border-red-200"
+};
+
+const statusColors = {
+  requested: "bg-slate-100 text-slate-700 border-slate-200",
+  accepted: "bg-blue-100 text-blue-700 border-blue-200",
+  checked_in: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  completed: "bg-green-100 text-green-700 border-green-200",
+  cancelled: "bg-gray-100 text-gray-700 border-gray-200"
+};
+
+export default function RequestCard({ request, onClick, showDistance }) {
+  return (
+    <Card 
+      onClick={onClick}
+      className="p-5 hover:shadow-lg transition-all duration-200 cursor-pointer border-slate-200 bg-white"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Badge className={`${urgencyColors[request.urgency]} border font-medium`}>
+            {request.urgency} urgency
+          </Badge>
+          <Badge className={`${statusColors[request.status]} border font-medium`}>
+            {request.status}
+          </Badge>
+        </div>
+        {showDistance && request.distance && (
+          <span className="text-sm font-semibold text-blue-600">
+            {request.distance} mi
+          </span>
+        )}
+      </div>
+
+      <h3 className="font-bold text-lg text-slate-900 mb-2">
+        {typeLabels[request.request_type]}
+      </h3>
+
+      <p className="text-sm text-slate-600 mb-4 line-clamp-2">
+        {request.description}
+      </p>
+
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2 text-slate-500">
+          <MapPin className="w-4 h-4" />
+          <span className="truncate">{request.location?.address}</span>
+        </div>
+        <div className="flex items-center gap-2 text-slate-500">
+          <Clock className="w-4 h-4" />
+          <span>{format(new Date(request.created_date), "MMM d, h:mm a")}</span>
+        </div>
+        {request.citizen_name && (
+          <div className="flex items-center gap-2 text-slate-500">
+            <User className="w-4 h-4" />
+            <span>{request.citizen_name}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
